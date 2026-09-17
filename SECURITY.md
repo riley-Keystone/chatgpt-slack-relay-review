@@ -27,7 +27,7 @@ No personal access token is required.
 
 ### Slack bot
 
-The bot is intended to use the minimum Slack scope required to post messages, currently `chat:write`, and to be manually added only to the target channel(s).
+The bot is intended to use the minimum Slack scope required to post messages, currently `chat:write`, and to be manually added only to the configured target channel(s).
 
 It does not require workspace administration, user management, file management, direct-message access, or broad channel-history access.
 
@@ -36,7 +36,9 @@ It does not require workspace administration, user management, file management, 
 Production values for the following settings are stored only in GitHub Actions Secrets:
 
 - `SLACK_BOT_TOKEN`
-- `SLACK_CHANNEL_ID`
+- `SLACK_CHANNEL_IDS`
+
+`SLACK_CHANNEL_IDS` is a comma-separated list of destination channel IDs. The relay strips whitespace and sends the same report to each configured channel.
 
 This public repository contains the secret names only. No production secret values, Slack workspace IDs, or channel IDs are included.
 
@@ -52,15 +54,16 @@ It is intentionally not stored under `.github/workflows/`, so GitHub Actions can
 
 - Issue-open event as the automatic relay trigger
 - explicit `GITHUB_TOKEN` permission declaration
-- approved Issue-title prefix validation
+- approved Issue-title prefix validation, including the scheduled P0 alert prefix
 - Pull Request rejection
 - empty-body rejection
 - maximum Issue-body size validation
 - Slack API `ok` response validation
 - retry handling for rate limiting and transient network errors
-- long-message splitting with follow-up chunks in a Slack thread
+- multi-channel delivery using `SLACK_CHANNEL_IDS`
+- long-message splitting with follow-up chunks in a Slack thread per channel
 - Slack link/media unfurl disabled
-- Issue close only after the sender process succeeds
+- Issue close only after the sender process succeeds for every configured channel
 - manual retry entry point via `workflow_dispatch`
 - concurrency grouping by Issue number
 
@@ -73,13 +76,14 @@ Reviewers should focus especially on:
 3. Whether Issue-title validation should use a stricter schema or regular expression instead of prefix matching.
 4. Whether relay identity should be restricted by Issue author, trusted label, dedicated GitHub App identity, or another control.
 5. Whether deterministic `report_id` metadata is needed for stronger idempotency.
-6. Behavior when a multi-part Slack delivery succeeds only partially.
-7. Whether retry behavior can result in duplicate Slack messages.
+6. Behavior when a multi-part or multi-channel Slack delivery succeeds only partially.
+7. Whether retry behavior can result in duplicate Slack messages in channels that already succeeded.
 8. Whether repository writers could modify a production workflow to misuse Actions secrets.
 9. Whether production secrets should move to a protected GitHub Environment.
 10. Whether third-party Actions should be pinned to immutable commit SHAs.
 11. Failure observability for scheduler failure, GitHub Actions failure, and Slack delivery failure.
-12. Whether `closed = delivered` is a sufficiently strong delivery-state model.
+12. Whether `closed = all configured Slack API calls succeeded` is a sufficiently strong delivery-state model.
+13. Whether destination channel configuration needs an allowlist or stronger change-control process.
 
 ## Deliberately excluded
 
@@ -91,4 +95,4 @@ This snapshot does not contain:
 - production Issue/report history
 - internal findings or incident details
 - internal owners, deadlines, or roadmap data
-- private repository identifiers beyond the intentionally published review-repository reference
+- production repository Secrets or environment values
