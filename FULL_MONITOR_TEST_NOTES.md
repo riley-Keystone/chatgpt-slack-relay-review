@@ -1,0 +1,1 @@
+This file is intentionally non-production and contains no credentials. Full-monitor test reports are not stored in this public review repository; they are created only in the private relay repository and forwarded through the production workflow.
