@@ -1,1 +1,69 @@
+# Review-only workflow example.
+# This file intentionally uses the .example suffix and is NOT placed under
+# .github/workflows/, so GitHub Actions will not execute it in this public repo.
+# Secret names are shown for review; no secret values or production identifiers
+# are included.
 
+name: Relay ChatGPT issue to Slack
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Open relay issue number to retry
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: slack-relay-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+
+    steps:
+      - name: Check out relay code
+        uses: actions/checkout@v4
+
+      - name: Load and validate relay issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}" > "$RUNNER_TEMP/issue.json"
+          python3 scripts/validate_issue.py "$RUNNER_TEMP/issue.json"
+
+          state="$(jq -r '.state' "$RUNNER_TEMP/issue.json")"
+          if [[ "$state" == "closed" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send issue to Slack
+        if: steps.issue.outputs.skip != 'true'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+        run: python3 scripts/send_to_slack.py "$RUNNER_TEMP/issue.json"
+
+      - name: Close successfully delivered issue
+        if: success() && steps.issue.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue close "$ISSUE_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --reason completed \
+            --comment "Delivered to Slack by workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
