@@ -55,7 +55,7 @@ jobs:
         if: steps.issue.outputs.skip != 'true'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          SLACK_CHANNEL_IDS: ${{ secrets.SLACK_CHANNEL_IDS }}
         run: python3 scripts/send_to_slack.py "$RUNNER_TEMP/issue.json"
 
       - name: Close successfully delivered issue
