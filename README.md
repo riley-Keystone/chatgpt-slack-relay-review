@@ -13,7 +13,7 @@ GitHub Actions validation / relay
         ↓
 Slack App
         ↓
-Designated Slack channel
+Configured Slack channels
 ```
 
 Responsibility split:
@@ -28,17 +28,17 @@ The main security boundary is intentional: ChatGPT does not hold the Slack bot t
 
 - ChatGPT GitHub access: intended to be limited to Issue search/read/create in one explicitly authorized relay repository. No repository admin, Secrets access, branch management, merge, or organization admin is required.
 - GitHub Actions `GITHUB_TOKEN`: `contents: read` and `issues: write` only.
-- Slack bot: intended minimum scope is `chat:write`, with the bot manually added only to the required target channel(s).
-- Production configuration: `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are stored only as GitHub Actions Secrets. This repository shows the names only, never the values.
+- Slack bot: intended minimum scope is `chat:write`, with the bot manually added only to required target channel(s).
+- Production configuration: `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_IDS` are stored only as GitHub Actions Secrets. `SLACK_CHANNEL_IDS` is a comma-separated list of channel IDs. This repository shows secret names only, never values.
 
 ## Review snapshot contents
 
 The public files mirror the relay logic closely enough for design/security review while removing production data and execution capability:
 
 - `SECURITY.md` — permission model, secret boundary, threat/review checklist
-- `examples/slack-relay.yml.example` — sanitized workflow example
-- `scripts/send_to_slack.py` — Slack sender, response validation, retry handling, message splitting/thread continuation
-- `scripts/validate_issue.py` — Issue validation and approved-title filtering
+- `examples/slack-relay.yml.example` — sanitized, non-executable workflow example
+- `scripts/send_to_slack.py` — multi-channel Slack sender, response validation, retry handling, message splitting/thread continuation
+- `scripts/validate_issue.py` — Issue validation and approved-title filtering, including P0 alert titles
 - `tests/test_relay.py` — representative unit tests
 
 ### Why there is no active workflow here
@@ -66,13 +66,15 @@ Load Issue JSON
     ↓
 Validate title / state / body
     ↓
-Send to Slack
+Read SLACK_CHANNEL_IDS
     ↓
-If successful: close Issue and add delivery comment
-If unsuccessful: workflow fails and Issue remains open
+Send the same report to each configured Slack channel
+    ↓
+If all configured channel deliveries succeed: close Issue and add delivery comment
+If any delivery fails: workflow fails and Issue remains open
 ```
 
-Long reports are split into smaller messages. The first message becomes the root Slack message and remaining chunks are sent as thread replies.
+Long reports are split into smaller messages. For each channel, the first message becomes the root Slack message and remaining chunks are sent as thread replies.
 
 The sender verifies Slack's JSON response and requires `ok=true`. HTTP 429 responses respect `Retry-After`; transient network failures are retried within a bounded attempt count.
 
@@ -91,7 +93,7 @@ Please review especially:
 - Whether ChatGPT, GitHub Actions, and Slack permissions are sufficiently minimal
 - Whether Issue-trigger identity should be restricted by author/App identity or trusted label
 - Whether prefix-based title validation should be replaced by a strict schema / regex
-- Idempotency and duplicate-delivery behavior, especially after partial Slack thread delivery
+- Idempotency and duplicate-delivery behavior, especially after partial Slack thread or partial multi-channel delivery
 - Manual retry semantics for open vs. already-completed Issues
 - Slack API failure handling and delivery-state semantics
 - Risk that repository writers could alter a production workflow consuming Secrets
@@ -105,9 +107,9 @@ This snapshot intentionally preserves several current design choices so they can
 
 1. Title validation currently uses `startswith()` against an allowlist rather than strict full-title matching.
 2. The relay currently relies primarily on Issue state and pre-create duplicate search rather than a deterministic `report_id`.
-3. A retry after partial multi-message Slack delivery could potentially duplicate already-delivered chunks.
+3. A retry after partial multi-message or multi-channel Slack delivery could potentially duplicate already-delivered content.
 4. The current workflow validates the Issue before checking whether it is already closed.
-5. The current approved alert prefix should be checked against the Scheduled Task's actual P0 alert title format so production alert titles cannot be rejected by the validator.
+5. Both scheduled full-report and P0 alert title prefixes are currently accepted, but strict title/date validation is not yet enforced.
 6. `actions/checkout@v4` is version-tag pinned, not immutable commit-SHA pinned.
 
 ## Deliberately excluded
