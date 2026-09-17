@@ -34,7 +34,7 @@ python3 -m py_compile scripts/send_to_slack.py scripts/validate_issue.py
 python3 -m unittest discover -s tests -v
 ```
 
-## CTO review scope
+## Review scope
 
 - Whether a GitHub Issue is an acceptable lightweight queue
 - Whether workflow permissions and Slack scopes are minimal
