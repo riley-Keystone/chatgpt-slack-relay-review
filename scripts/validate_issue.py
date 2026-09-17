@@ -8,9 +8,11 @@ import sys
 ALLOWED_PREFIXES = (
     "Chain & Wallet Compatibility | ",
     "Chain & Wallet Compatibility Report | ",
+    "P0 Alert | Chain & Wallet Compatibility | ",
     "Chain Compatibility Alert | ",
     "ChatGPT → GitHub → Slack E2E Test",
 )
+
 MAX_BODY_CHARS = 120_000
 
 
@@ -24,10 +26,13 @@ def validate(issue: dict) -> None:
 
     if not title.startswith(ALLOWED_PREFIXES):
         raise ValueError("Issue title is not an approved relay type")
+
     if state not in {"open", "closed"}:
         raise ValueError("Issue state is invalid")
+
     if not body:
         raise ValueError("Issue body is empty")
+
     if len(body) > MAX_BODY_CHARS:
         raise ValueError("Issue body is too large")
 
@@ -35,10 +40,15 @@ def validate(issue: dict) -> None:
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("Usage: validate_issue.py ISSUE_JSON")
+
     with open(sys.argv[1], encoding="utf-8") as file:
         issue = json.load(file)
+
     validate(issue)
-    print(f"Validated relay issue #{issue.get('number', 'unknown')}")
+
+    print(
+        f"Validated relay issue #{issue.get('number', 'unknown')}"
+    )
 
 
 if __name__ == "__main__":
